@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="gu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tapalwalo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Bhai+2:wght@600;800&family=Hind+Vadodara:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: full-bleed top-down town on a canvas; compact HUD card top-left, minimap top-right,
+   stick and bell at the bottom, dialog sheet slides over the bottom edge. Single committed look: Uttarayan day. */
+:root{
+  --ink:#1b1840; --haldi:#f6b700; --kesar:#ff7b1c; --rani:#d92a73; --neel:#2a3fa0; --mehndi:#2e8b57;
+  --card:#f5f3ff;
+  --display:"Baloo Bhai 2","Hind Vadodara",system-ui,sans-serif;
+  --body:"Hind Vadodara","Baloo Bhai 2",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--ink);color:#fff;font-family:var(--body);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+#app{position:relative;width:100%;height:100%;overflow:hidden}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;top:10px;left:max(10px,env(safe-area-inset-left,0px));max-width:min(64vw,400px);background:rgba(27,24,64,.88);border-radius:14px;padding:8px 12px 9px;line-height:1.25;box-sizing:border-box}
+.hud .row1{display:flex;gap:12px;align-items:baseline;font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:.02em;color:#ffd75e;font-variant-numeric:tabular-nums}
+.hud .obj{font-family:var(--display);font-weight:800;font-size:18px;margin-top:2px}
+.hud .sub{font-size:12.5px;opacity:.8}
+.hud .carry{font-size:12px;color:#9ee0b8;margin-top:3px}
+#mm{position:absolute;top:10px;right:max(10px,env(safe-area-inset-right,0px));width:132px;height:99px;border-radius:12px;border:2px solid rgba(255,255,255,.55);background:#4b4969}
+#toast{position:absolute;left:50%;top:128px;transform:translateX(-50%);background:var(--haldi);color:var(--ink);font-family:var(--display);font-weight:800;font-size:17px;padding:6px 14px;border-radius:999px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s}
+#toast.on{opacity:1}
+#stick{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:max(20px,env(safe-area-inset-bottom,0px));width:124px;height:124px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.4);display:none;touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(255,255,255,.75)}
+@media (pointer:coarse){#stick{display:block}}
+#bell{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:max(24px,env(safe-area-inset-bottom,0px));width:76px;height:76px;border-radius:50%;border:3px solid var(--ink);background:var(--haldi);color:var(--ink);font-family:var(--display);font-weight:800;font-size:14px;line-height:1.05;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+#bell:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+#bell small{display:block;font-size:10px;font-weight:600;opacity:.75}
+#dlg{position:absolute;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));bottom:max(10px,env(safe-area-inset-bottom,0px));max-width:600px;margin:0 auto;background:var(--card);color:var(--ink);border-radius:20px;padding:14px 18px 16px;box-shadow:0 10px 0 rgba(0,0,0,.25);box-sizing:border-box}
+#dlg .who{font-family:var(--display);font-weight:800;font-size:19px;color:var(--rani)}
+#dlg .who small{font-weight:600;font-size:13px;color:var(--neel);margin-left:6px}
+#dlg .place{font-size:12.5px;color:#5b5880;margin-bottom:6px}
+#dlg .gu{font-size:20px;line-height:1.5;margin:0 0 6px}
+#dlg .en{font-size:14.5px;line-height:1.45;margin:0;color:#4a476e}
+#dlg .foot{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap}
+#dlg .gain{font-size:13.5px;color:var(--mehndi);font-weight:600;min-width:0;flex:1 1 180px}
+button.go{font-family:var(--display);font-weight:800;font-size:18px;background:var(--rani);color:#fff;border:0;border-radius:999px;padding:9px 22px;cursor:pointer;box-shadow:0 4px 0 #8f1a4c}
+button.go:active{transform:translateY(2px);box-shadow:0 2px 0 #8f1a4c}
+button.go:focus-visible,#bell:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;overflow:auto;
+  background:radial-gradient(circle at 50% 50%,rgba(246,183,0,.25) 0 3px,transparent 4px) 0 0/26px 26px,linear-gradient(160deg,#2a3fa0,#1b1840 70%)}
+.screen .box{max-width:460px;text-align:left;margin:auto}
+.screen h1{font-family:var(--display);font-weight:800;font-size:clamp(44px,13vw,76px);line-height:.95;margin:0;color:var(--haldi)}
+.screen h1 span{display:block;font-size:.42em;color:#fff;letter-spacing:.14em;text-transform:uppercase;margin-top:8px}
+.screen p{font-size:16px;line-height:1.55;margin:16px 0 0;color:#e6e4ff}
+.screen p.gu{font-size:18px;color:#fff}
+.screen ul{margin:16px 0 20px;padding:0;list-style:none;font-size:14px;line-height:1.7;color:#cfcdf5}
+.screen li b{color:var(--haldi);font-family:var(--display)}
+.stats{display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 4px;font-family:var(--display);font-weight:800;font-size:26px;color:var(--haldi);font-variant-numeric:tabular-nums}
+.stats small{display:block;font-size:12px;font-weight:600;color:#cfcdf5;letter-spacing:.06em}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+
+<div id="app">
+  <canvas id="c"></canvas>
+  <div class="hud" id="hud">
+    <div class="row1"><span id="stopno">0/6</span><span id="rs">₹0</span><span id="tm">0s</span></div>
+    <div class="obj" id="objGu">—</div>
+    <div class="sub" id="objEn">—</div>
+    <div class="carry" id="carry"></div>
+  </div>
+  <canvas id="mm" width="264" height="198"></canvas>
+  <div id="toast"></div>
+  <div id="stick"><div id="knob"></div></div>
+  <button id="bell" type="button">ઘંટડી<small>Bell · Space</small></button>
+  <div id="dlg" hidden>
+    <div class="who"><span id="whoGu"></span><small id="whoEn"></small></div>
+    <div class="place" id="place"></div>
+    <p class="gu" id="dgu"></p>
+    <p class="en" id="den"></p>
+    <div class="foot"><div class="gain" id="gain"></div><button class="go" id="next" type="button">ચાલો · Go</button></div>
+  </div>
+  <div class="screen" id="start">
+    <div class="box">
+      <h1>ટપાલવાળો<span>Tapalwalo</span></h1>
+      <p class="gu">ઉત્તરાયણ પહેલાં આખા ગામમાં કંકોત્રી પહોંચાડો!</p>
+      <p>You are the town's messenger. Carry a wedding card from neighbour to neighbour across a Gujarat town, over the river and back. Dodge cows and rickshaws, grab jalebi for a speed boost, and beat the clock.</p>
+      <ul>
+        <li><b>Move</b> arrow keys, WASD, or the on-screen stick</li>
+        <li><b>Bell</b> Space or the yellow button. Cows move along when you ring it</li>
+        <li><b>Deliver</b> ride up to the glowing person</li>
+      </ul>
+      <button class="go" id="go" type="button">શરૂ કરો · Start</button>
+    </div>
+  </div>
+  <div class="screen" id="end" hidden>
+    <div class="box">
+      <h1 id="endGu">શાબાશ!</h1>
+      <p class="gu" id="endMsg"></p>
+      <div class="stats">
+        <div><span id="eScore">0</span><small>કમાણી · EARNED ₹</small></div>
+        <div><span id="eTime">0:00</span><small>સમય · TIME</small></div>
+        <div><span id="eBump">0</span><small>અથડામણ · BUMPS</small></div>
+      </div>
+      <p id="endEn"></p>
+      <button class="go" id="again" type="button" style="margin-top:18px">ફરી રમો · Play again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id)};
+var cv=$('c'),ctx=cv.getContext('2d'),mm=$('mm'),mctx=mm.getContext('2d');
+var WW=2400,WH=1800,TAU=Math.PI*2;
+var C={ink:'#1b1840',haldi:'#f6b700',kesar:'#ff7b1c',rani:'#d92a73',neel:'#2a3fa0',mehndi:'#2e8b57',sand:'#e8c48a',cell:'#f0d49e',road:'#4b4969',water:'#3aa0c8',grass:'#8cc07a'};
+var VW=0,VH=0,DPR=1,zoom=1;
+
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=cv.clientWidth;VH=cv.clientHeight;
+  cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);
+  zoom=Math.max(.62,Math.min(1.1,Math.min(VW,VH*1.5)/860));
+}
+window.addEventListener('resize',resize);resize();
+
+/* ---------- helpers ---------- */
+var seed=7;
+function rng(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+function shade(hex,k){var n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255,f=k<0?0:255,t=Math.abs(k);
+  return 'rgb('+Math.round(r+(f-r)*t)+','+Math.round(g+(g<0?0:0)+(f-g)*t)+','+Math.round(b+(f-b)*t)+')'}
+function rrect(x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h)}
+function frr(x,y,w,h,r,f){rrect(x,y,w,h,r);ctx.fillStyle=f;ctx.fill()}
+function disc(x,y,r,f){ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fillStyle=f;ctx.fill()}
+function ell(x,y,rx,ry,f,rot){ctx.beginPath();ctx.ellipse(x,y,rx,ry,rot||0,0,TAU);ctx.fillStyle=f;ctx.fill()}
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+function lerpAng(a,b,k){var d=((b-a+Math.PI)%TAU+TAU)%TAU-Math.PI;return a+d*clamp(k,0,1)}
+var FONT='"Baloo Bhai 2","Hind Vadodara",system-ui,sans-serif';
+
+/* ---------- world ---------- */
+var COLS=[[40,230],[370,930],[1070,1630],[1770,2360]];
+var ROWS=[[40,190],[330,690],[830,1090],[1230,1340]];
+var PAL=['#e4572e','#f3a712','#2e86ab','#c2379b','#3a9d5d','#7a5cc7','#ef8354','#1f9e9e'];
+var solids=[];
+var plaza={x:1770,y:830,w:590,h:260,cx:2065,cy:960};
+var cells=[];
+function addSolid(o){solids.push(o);return o}
+(function build(){
+  var r,c,x0,x1,y0,y1,key,n,hw,i,h;
+  for(r=0;r<ROWS.length;r++)for(c=0;c<COLS.length;c++){
+    x0=COLS[c][0];x1=COLS[c][1];y0=ROWS[r][0];y1=ROWS[r][1];
+    cells.push({x:x0,y:y0,w:x1-x0,h:y1-y0});
+    key=c+','+r;
+    if(key==='3,2')continue;
+    if(key==='1,1'){addSolid({x:392,y:352,w:516,h:316,c:'#f3a712',sign:'ખમણ હાઉસ',sign2:'Khaman House',dots:1});continue}
+    if(key==='2,2'){addSolid({x:1092,y:852,w:516,h:216,c:'#c8102e',sign:'ટપાલ ઘર',sign2:'Tapal Ghar · Post Office',dots:0});continue}
+    if(key==='3,1'){addSolid({x:1792,y:352,w:546,h:316,c:'#2e86ab',sign:'પતંગ બજાર',sign2:'Patang Bazaar',dots:1,kite:1});continue}
+    n=Math.max(1,Math.round((x1-x0)/165));
+    hw=((x1-x0)-16*(n-1)-16)/n;
+    for(i=0;i<n;i++){
+      h=(y1-y0)-18-Math.floor(rng()*22);
+      if(h<70)h=y1-y0-16;
+      addSolid({x:x0+8+i*(hw+16),y:y0+8,w:hw,h:h,c:PAL[Math.floor(rng()*PAL.length)],dots:rng()<.25?1:0,dx:rng()});
+    }
+  }
+  /* river */
+  addSolid({x:0,y:1340,w:940,h:160,kind:'water'});
+  addSolid({x:1060,y:1340,w:1340,h:160,kind:'water'});
+  /* south bank */
+  addSolid({x:300,y:1528,w:420,h:92,kind:'vav',c:'#b88a5a',sign:'વાવ',sign2:'Stepwell'});
+  addSolid({x:1480,y:1522,w:340,h:98,c:'#f0c26a',kind:'temple',sign:'મંદિર',sign2:'Temple'});
+  addSolid({x:60,y:1540,w:190,h:80,c:PAL[2],dx:.3});
+  addSolid({x:780,y:1540,w:140,h:80,c:PAL[4],dx:.6});
+  addSolid({x:1090,y:1540,w:330,h:80,c:PAL[6],dx:.2});
+  addSolid({x:1900,y:1540,w:420,h:80,c:PAL[3],dx:.7});
+})();
+
+/* ---------- stops ---------- */
+var STOPS=[
+ {gn:'પોસ્ટમાસ્તર કાકા',en:'Postmaster Kaka',pl:'ટપાલ ઘર',ple:'Tapal Ghar',x:1000,y:960,shirt:'#c8102e',hat:'#ffffff',
+  gu:'કેમ છો! આ કંકોત્રી લઈ જા. ઉત્તરાયણ પહેલાં બધાને પહોંચાડવાની છે. પહેલાં કાંતાબેનને ખમણ હાઉસમાં આપજે.',
+  e:'Kem cho! Take this wedding card around. Everyone needs it before Uttarayan. First, give it to Kantaben at the Khaman House.',
+  carry:'કંકોત્રી · wedding card'},
+ {gn:'કાંતાબેન',en:'Kantaben',pl:'ખમણ હાઉસ',ple:'Khaman House',x:1000,y:520,shirt:'#e4572e',hat:'#1b1840',bun:1,
+  gu:'અરે વાહ, કંકોત્રી! લે, પહેલાં ગરમ ખમણ ખા. પછી આ ચિઠ્ઠી પતંગ બજારમાં ભાઈને આપી આવ.',
+  e:'Oh wow, an invitation! First have some hot khaman. Then take this note to the kite seller at Patang Bazaar.',
+  carry:'ખમણની ચિઠ્ઠી · khaman note'},
+ {gn:'પતંગવાળા ભાઈ',en:'Kite-seller Bhai',pl:'પતંગ બજાર',ple:'Patang Bazaar',x:1700,y:520,shirt:'#2e86ab',hat:'#f6b700',
+  gu:'કાઈ પો છે! મજા આવશે. આ દોરી અને ચિઠ્ઠી ગરબા ચોકમાં દીદીને આપી દે.',
+  e:'Kai po che! This will be fun. Take this string and note to Didi at the Garba Chowk.',
+  carry:'દોરી અને ચિઠ્ઠી · string and note'},
+ {gn:'ગરબા દીદી',en:'Garba Didi',pl:'ગરબા ચોક',ple:'Garba Chowk',x:2065,y:960,shirt:'#d92a73',hat:'#1b1840',bun:1,
+  gu:'તાળી પાડો! ગરબાની પ્રેક્ટિસ ચાલુ છે. હવે નદી પાર વાવવાળા દાદાને આ સંદેશો આપજે.',
+  e:'Clap along! Garba practice is on. Now carry this message across the river to Dadaji at the stepwell.',
+  carry:'ગરબાનો સંદેશો · garba message'},
+ {gn:'વાવવાળા દાદા',en:'Dadaji of the Vav',pl:'વાવ',ple:'Stepwell',x:500,y:1690,shirt:'#8a6a4a',hat:'#ffffff',
+  gu:'બેટા, પુલ પાર કરીને આવ્યો? શાબાશ! આ પ્રસાદ લઈ જા અને મંદિરના પૂજારીને આપજે.',
+  e:'Beta, you crossed the bridge? Shabash! Take this prasad to the temple priest.',
+  carry:'પ્રસાદ · prasad'},
+ {gn:'પૂજારી',en:'Temple priest',pl:'મંદિર',ple:'Temple',x:1650,y:1690,shirt:'#ff7b1c',hat:'#ffffff',
+  gu:'જય શ્રી કૃષ્ણ! બધું શુભ છે. હવે પોસ્ટમાસ્તરને કહેજે કે લગ્ન ધામધૂમથી થશે.',
+  e:'Jai Shri Krishna! All is auspicious. Tell the postmaster the wedding will be a grand celebration.',
+  carry:'શુભ સમાચાર · good news'},
+ {gn:'પોસ્ટમાસ્તર કાકા',en:'Postmaster Kaka',pl:'ટપાલ ઘર',ple:'Tapal Ghar',x:1000,y:960,shirt:'#c8102e',hat:'#ffffff',
+  gu:'શાબાશ, ટપાલવાળા! આખા ગામમાં કંકોત્રી પહોંચી ગઈ. ચાલો, હવે બધા સાથે ચા પીએ!',
+  e:'Well done, messenger! The whole town has the invitation. Come, let us all have chai!',
+  carry:''}
+];
+var LAST=STOPS.length-1;
+
+/* ---------- moving things ---------- */
+var cows=[],rickshaws=[],pickups=[],kites=[];
+function mk(ax,ay,bx,by,sp,extra){var o={ax:ax,ay:ay,bx:bx,by:by,len:Math.hypot(bx-ax,by-ay),t:Math.random(),dir:1,sp:sp,pause:0,cd:0,startle:0,x:ax,y:ay};for(var k in extra)o[k]=extra[k];return o}
+function resetThings(){
+  cows=[mk(480,760,820,760,26),mk(1000,420,1000,640,26),mk(1700,880,1700,1060,26),mk(1180,1160,1560,1160,26),mk(300,470,300,660,26),mk(1200,1690,1460,1690,26)];
+  rickshaws=[mk(80,285,2320,285,120,{col:'#f6b700'}),mk(1725,80,1725,1300,105,{col:'#2e8b57'}),mk(80,1715,2320,1715,90,{col:'#f6b700'})];
+  var pts=[[300,260],[300,760],[300,1160],[1000,260],[1000,1160],[1700,260],[1700,760],[1700,1160],[1000,1690],[500,1690],[2000,1690]];
+  pickups=pts.map(function(p){return{x:p[0],y:p[1],on:true,re:0}});
+  kites=[];
+  for(var i=0;i<10;i++)kites.push({x:Math.random()*WW,y:Math.random()*WH,vx:12+Math.random()*16,vy:-4+Math.random()*8,col:PAL[i%PAL.length],ph:Math.random()*6,s:16+Math.random()*10});
+}
+function moveThing(o,dt,isCow){
+  if(o.cd>0)o.cd-=dt;
+  if(o.pause>0){o.pause-=dt;return}
+  var sp=o.sp*(o.startle>0?3.2:1);
+  if(o.startle>0)o.startle-=dt;
+  o.t+=o.dir*sp*dt/o.len;
+  if(o.t>=1){o.t=1;o.dir=-1;if(isCow)o.pause=1+Math.random()*3}
+  if(o.t<=0){o.t=0;o.dir=1;if(isCow)o.pause=1+Math.random()*3}
+  o.x=o.ax+(o.bx-o.ax)*o.t;o.y=o.ay+(o.by-o.ay)*o.t;
+}
+
+/* ---------- game state ---------- */
+var state='intro',cur=1,score=0,bumps=0,total=0,leg=60,boost=0,tclock=0,bellFx=0;
+var p={x:1000,y:880,vx:0,vy:0,ang:Math.PI/2,slow:0};
+var cam={x:1000,y:880};
+var keys={},joy={x:0,y:0};
+
+function legTime(i){var a=STOPS[i],b=STOPS[i+1];return clamp((Math.abs(a.x-b.x)+Math.abs(a.y-b.y))/150+12,25,95)}
+function reset(){
+  score=0;bumps=0;total=0;boost=0;cur=1;
+  p.x=1000;p.y=880;p.vx=p.vy=0;p.ang=Math.PI/2;p.slow=0;cam.x=p.x;cam.y=p.y;
+  resetThings();leg=legTime(0);
+}
+
+/* ---------- toast ---------- */
+var toastT=0;
+function toast(s){var t=$('toast');t.textContent=s;t.className='on';clearTimeout(toastT);toastT=setTimeout(function(){t.className=''},1600)}
+
+/* ---------- dialog ---------- */
+var dlgIdx=0,dlgBonus=0;
+function openDialog(i,reward,bonus){
+  var s=STOPS[i];dlgIdx=i;state='dialog';
+  $('whoGu').textContent=s.gn;$('whoEn').textContent=s.en;
+  $('place').textContent=s.pl+' · '+s.ple;
+  $('dgu').textContent=s.gu;$('den').textContent=s.e;
+  var g='';
+  if(reward)g+='+₹'+reward+(bonus?' (સમય બોનસ ₹'+bonus+')':'')+'  ';
+  if(i<LAST)g+=(g?'· ':'')+'હવે તમારી પાસે: '+s.carry;
+  $('gain').textContent=g;
+  $('next').textContent=i===LAST?'પૂર્ણ · Finish':'ચાલો · Go';
+  $('dlg').hidden=false;
+  setTimeout(function(){try{$('next').focus({preventScroll:true})}catch(e){}},30);
+}
+function nextDialog(){
+  if(state!=='dialog')return;
+  $('dlg').hidden=true;
+  if(dlgIdx===LAST){finish();return}
+  cur=dlgIdx+1;leg=legTime(dlgIdx);state='play';
+}
+function arrive(i){
+  var base=50,bonus=Math.max(0,Math.floor(leg))*2;
+  if(i===0){openDialog(0,0,0);return}
+  score+=base+bonus;
+  openDialog(i,base+bonus,bonus);
+}
+function finish(){
+  state='end';
+  $('eScore').textContent=score;
+  var m=Math.floor(total/60),s=Math.floor(total%60);
+  $('eTime').textContent=m+':'+(s<10?'0':'')+s;
+  $('eBump').textContent=bumps;
+  var gu,msg,en;
+  if(score>=600){gu='ગુજરાતનો ટપાલી!';msg='તમારી ઝડપ જોઈને કાકા પણ ખુશ!';en='Top marks. Kaka is thrilled with your speed.'}
+  else if(score>=420){gu='શાબાશ ટપાલી!';msg='બધી કંકોત્રી સમયસર પહોંચી.';en='Every card arrived on time. Try fewer bumps for a higher score.'}
+  else{gu='કંકોત્રી પહોંચી ગઈ!';msg='થોડી વધુ ઝડપથી પ્રયત્ન કરો.';en='All delivered. Take the roads faster and grab more jalebi next time.'}
+  $('endGu').textContent=gu;$('endMsg').textContent=msg;$('endEn').textContent=en;
+  $('end').hidden=false;
+}
+
+/* ---------- input ---------- */
+window.addEventListener('keydown',function(e){
+  var k=e.key;
+  if(k===' '||k==='Enter'){
+    if(state==='dialog'){e.preventDefault();nextDialog();return}
+    if(state==='play'&&k===' '){e.preventDefault();ring()}
+    return;
+  }
+  if(k.indexOf('Arrow')===0)e.preventDefault();
+  keys[k.length===1?k.toLowerCase():k]=true;
+});
+window.addEventListener('keyup',function(e){var k=e.key;keys[k.length===1?k.toLowerCase():k]=false});
+window.addEventListener('blur',function(){keys={}});
+$('next').addEventListener('click',nextDialog);
+$('bell').addEventListener('click',function(){if(state==='play')ring()});
+$('go').addEventListener('click',function(){
+  $('start').hidden=true;reset();state='dialog';openDialog(0,0,0);
+});
+$('again').addEventListener('click',function(){$('end').hidden=true;reset();state='dialog';openDialog(0,0,0)});
+var stick=$('stick'),knob=$('knob'),sid=null;
+function stickMove(e){
+  var r=stick.getBoundingClientRect(),dx=(e.clientX-(r.left+r.width/2))/(r.width/2),dy=(e.clientY-(r.top+r.height/2))/(r.height/2),m=Math.hypot(dx,dy);
+  if(m>1){dx/=m;dy/=m}
+  if(m<.12){dx=0;dy=0}
+  joy.x=dx;joy.y=dy;knob.style.transform='translate('+(dx*36)+'px,'+(dy*36)+'px)';
+}
+stick.addEventListener('pointerdown',function(e){sid=e.pointerId;try{stick.setPointerCapture(e.pointerId)}catch(_){}stickMove(e)});
+stick.addEventListener('pointermove',function(e){if(e.pointerId===sid)stickMove(e)});
+function stickEnd(e){if(e.pointerId===sid){sid=null;joy.x=0;joy.y=0;knob.style.transform=''}}
+stick.addEventListener('pointerup',stickEnd);stick.addEventListener('pointercancel',stickEnd);
+
+function ring(){
+  bellFx=.6;toast('ટ્રિન ટ્રિન!');
+  cows.forEach(function(c){
+    if(Math.hypot(c.x-p.x,c.y-p.y)<170){
+      var da=Math.hypot(c.ax-p.x,c.ay-p.y),db=Math.hypot(c.bx-p.x,c.by-p.y);
+      c.dir=db>da?1:-1;c.pause=0;c.startle=1.6;
+    }
+  });
+}
+
+/* ---------- update ---------- */
+function collideSolids(){
+  var R=14,i,s,cx,cy,dx,dy,d2,d,nx,ny,vn,pen;
+  for(i=0;i<solids.length;i++){
+    s=solids[i];
+    cx=clamp(p.x,s.x,s.x+s.w);cy=clamp(p.y,s.y,s.y+s.h);
+    dx=p.x-cx;dy=p.y-cy;d2=dx*dx+dy*dy;
+    if(d2>=R*R)continue;
+    if(d2>.0001){d=Math.sqrt(d2);nx=dx/d;ny=dy/d;pen=R-d}
+    else{
+      var l=p.x-s.x,r=s.x+s.w-p.x,t=p.y-s.y,b=s.y+s.h-p.y,m=Math.min(l,r,t,b);
+      nx=0;ny=0;
+      if(m===l)nx=-1;else if(m===r)nx=1;else if(m===t)ny=-1;else ny=1;
+      pen=m+R;
+    }
+    p.x+=nx*pen;p.y+=ny*pen;
+    vn=p.vx*nx+p.vy*ny;
+    if(vn<0){p.vx-=vn*nx;p.vy-=vn*ny}
+  }
+}
+function updateThings(dt){
+  var i;
+  for(i=0;i<cows.length;i++)moveThing(cows[i],dt,true);
+  for(i=0;i<rickshaws.length;i++)moveThing(rickshaws[i],dt,false);
+  for(i=0;i<pickups.length;i++){var k=pickups[i];if(!k.on){k.re-=dt;if(k.re<=0)k.on=true}}
+  for(i=0;i<kites.length;i++){var q=kites[i];q.x+=q.vx*dt;q.y+=(q.vy+Math.sin(q.ph+tclock)*10)*dt;if(q.x>WW+60)q.x=-60;if(q.y<-60)q.y=WH+60;if(q.y>WH+60)q.y=-60}
+}
+function update(dt){
+  var ix=0,iy=0,i;
+  if(keys.ArrowLeft||keys.a)ix-=1;
+  if(keys.ArrowRight||keys.d)ix+=1;
+  if(keys.ArrowUp||keys.w)iy-=1;
+  if(keys.ArrowDown||keys.s)iy+=1;
+  ix+=joy.x;iy+=joy.y;
+  var m=Math.hypot(ix,iy);if(m>1){ix/=m;iy/=m}
+  boost=Math.max(0,boost-dt);p.slow=Math.max(0,p.slow-dt);
+  var mx=(boost>0?340:220)*(p.slow>0?.45:1);
+  var k=Math.min(1,dt*5);
+  p.vx+=(ix*mx-p.vx)*k;p.vy+=(iy*mx-p.vy)*k;
+  p.x+=p.vx*dt;p.y+=p.vy*dt;
+  collideSolids();
+  p.x=clamp(p.x,20,WW-20);p.y=clamp(p.y,20,WH-20);
+  if(Math.hypot(p.vx,p.vy)>25)p.ang=lerpAng(p.ang,Math.atan2(p.vy,p.vx),dt*10);
+  /* cows */
+  for(i=0;i<cows.length;i++){
+    var c=cows[i],dx=p.x-c.x,dy=p.y-c.y,d=Math.hypot(dx,dy);
+    if(d<34&&d>0){
+      p.x+=dx/d*(34-d);p.y+=dy/d*(34-d);p.vx*=.3;p.vy*=.3;p.slow=.6;
+      if(c.cd<=0){c.cd=1.5;bumps++;toast('ગાય રસ્તામાં છે!')}
+    }
+  }
+  /* rickshaws */
+  for(i=0;i<rickshaws.length;i++){
+    var r=rickshaws[i],ex=p.x-r.x,ey=p.y-r.y,e=Math.hypot(ex,ey);
+    if(e<32&&e>0){
+      p.x+=ex/e*(32-e);p.y+=ey/e*(32-e);p.vx+=ex/e*260;p.vy+=ey/e*260;
+      if(r.cd<=0){r.cd=1;bumps++;score=Math.max(0,score-3);toast('રિક્ષા! −₹3')}
+    }
+  }
+  /* jalebi */
+  for(i=0;i<pickups.length;i++){
+    var q=pickups[i];
+    if(q.on&&Math.hypot(q.x-p.x,q.y-p.y)<30){q.on=false;q.re=20;boost=3;toast('જલેબી! સ્પીડ બૂસ્ટ')}
+  }
+  leg-=dt;total+=dt;
+  var t=STOPS[cur];
+  if(Math.hypot(t.x-p.x,t.y-p.y)<65)arrive(cur);
+}
+
+/* ---------- drawing ---------- */
+function drawGround(){
+  ctx.fillStyle=C.sand;ctx.fillRect(0,0,WW,WH);
+  ctx.fillStyle=C.grass;ctx.fillRect(0,1500,WW,300);
+  var i;
+  for(i=0;i<cells.length;i++){var c=cells[i];ctx.fillStyle=C.cell;ctx.fillRect(c.x,c.y,c.w,c.h);ctx.strokeStyle='rgba(27,24,64,.18)';ctx.lineWidth=3;ctx.strokeRect(c.x,c.y,c.w,c.h)}
+  ctx.fillStyle=C.road;
+  [300,1000,1700].forEach(function(x){ctx.fillRect(x-70,0,140,1340)});
+  [260,760,1160].forEach(function(y){ctx.fillRect(0,y-70,WW,140)});
+  ctx.fillRect(0,1620,WW,140);ctx.fillRect(930,1500,140,300);
+  ctx.strokeStyle='rgba(255,246,224,.38)';ctx.lineWidth=3;ctx.setLineDash([24,20]);
+  ctx.beginPath();
+  [300,1000,1700].forEach(function(x){ctx.moveTo(x,0);ctx.lineTo(x,1340)});
+  [260,760,1160].forEach(function(y){ctx.moveTo(0,y);ctx.lineTo(WW,y)});
+  ctx.moveTo(0,1690);ctx.lineTo(WW,1690);ctx.moveTo(1000,1500);ctx.lineTo(1000,1800);
+  ctx.stroke();ctx.setLineDash([]);
+  /* river */
+  ctx.fillStyle=C.water;ctx.fillRect(0,1340,WW,160);
+  ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=3;
+  for(i=0;i<22;i++){
+    var rx=(i*113+tclock*18)%(WW+100)-50,ry=1360+(i%5)*30;
+    ctx.beginPath();ctx.moveTo(rx,ry);ctx.quadraticCurveTo(rx+14,ry-6,rx+28,ry);ctx.stroke();
+  }
+  ctx.fillStyle='rgba(27,24,64,.25)';ctx.fillRect(0,1336,WW,5);ctx.fillRect(0,1500,WW,5);
+  /* bridge */
+  ctx.fillStyle='#8a6a4a';ctx.fillRect(930,1330,140,180);
+  ctx.strokeStyle='rgba(27,24,64,.35)';ctx.lineWidth=2;
+  for(i=1335;i<1505;i+=14){ctx.beginPath();ctx.moveTo(930,i);ctx.lineTo(1070,i);ctx.stroke()}
+  ctx.fillStyle=C.ink;ctx.fillRect(926,1330,8,180);ctx.fillRect(1066,1330,8,180);
+  /* plaza */
+  ctx.fillStyle='#f0b44c';ctx.fillRect(plaza.x,plaza.y,plaza.w,plaza.h);
+  ctx.strokeStyle=C.rani;ctx.lineWidth=6;ctx.setLineDash([2,14]);ctx.lineCap='round';ctx.strokeRect(plaza.x+10,plaza.y+10,plaza.w-20,plaza.h-20);ctx.setLineDash([]);ctx.lineCap='butt';
+  ctx.beginPath();ctx.arc(plaza.cx,plaza.cy,112,0,TAU);ctx.strokeStyle=C.rani;ctx.lineWidth=8;ctx.stroke();
+  ctx.beginPath();ctx.arc(plaza.cx,plaza.cy,80,0,TAU);ctx.strokeStyle=C.neel;ctx.lineWidth=8;ctx.stroke();
+  disc(plaza.cx,plaza.cy,46,C.haldi);
+}
+function drawBuilding(s){
+  if(s.kind==='water')return;
+  if(s.kind==='vav'){
+    ctx.fillStyle='rgba(27,24,64,.25)';ctx.fillRect(s.x+7,s.y+9,s.w,s.h);
+    var j,cols=['#b88a5a','#a07548','#8a6238','#6e4c2a','#4e361d'];
+    for(j=0;j<5;j++){ctx.fillStyle=cols[j];ctx.fillRect(s.x+j*12,s.y+j*9,s.w-j*24,s.h-j*18)}
+    plaque(s.x+s.w/2,s.y+s.h/2-2,s.sign,s.sign2);
+    return;
+  }
+  ctx.fillStyle='rgba(27,24,64,.28)';ctx.fillRect(s.x+9,s.y+11,s.w,s.h);
+  ctx.fillStyle=shade(s.c,-.38);ctx.fillRect(s.x,s.y,s.w,s.h);
+  var wy=s.y+s.h-22,i,nw=Math.floor(s.w/46);
+  ctx.fillStyle='rgba(255,246,224,.85)';
+  for(i=0;i<nw;i++)ctx.fillRect(s.x+14+i*46,wy,16,11);
+  var dxp=s.x+(s.dx!==undefined?(.15+s.dx*.7)*(s.w-30):s.w/2-10);
+  ctx.fillStyle=C.ink;ctx.fillRect(dxp,s.y+s.h-24,18,24);
+  frr(s.x-4,s.y-16,s.w+8,s.h-14,5,s.c);
+  ctx.strokeStyle='rgba(0,0,0,.13)';ctx.lineWidth=2;
+  for(var yy=s.y-4;yy<s.y+s.h-34;yy+=12){ctx.beginPath();ctx.moveTo(s.x,yy);ctx.lineTo(s.x+s.w,yy);ctx.stroke()}
+  if(s.dots){
+    ctx.fillStyle='rgba(255,246,224,.4)';
+    for(var gx=s.x+10;gx<s.x+s.w-6;gx+=18)for(var gy=s.y-6;gy<s.y+s.h-34;gy+=18){ctx.beginPath();ctx.arc(gx+((gy/18|0)%2)*9,gy,2.6,0,TAU);ctx.fill()}
+  }
+  rrect(s.x-4,s.y-16,s.w+8,s.h-14,5);ctx.strokeStyle=shade(s.c,-.45);ctx.lineWidth=3;ctx.stroke();
+  if(s.kind==='temple'){
+    var cx=s.x+s.w/2;
+    frr(cx-60,s.y-34,120,30,4,'#f7d98c');frr(cx-42,s.y-58,84,28,4,'#f2c866');frr(cx-24,s.y-80,48,26,4,'#eab948');
+    ctx.fillStyle=C.ink;ctx.fillRect(cx-1.5,s.y-104,3,26);
+    ctx.fillStyle=C.kesar;ctx.beginPath();ctx.moveTo(cx+1.5,s.y-104);ctx.lineTo(cx+26,s.y-96);ctx.lineTo(cx+1.5,s.y-88);ctx.fill();
+  }
+  if(s.sign)plaque(s.x+s.w/2,s.y+s.h/2-18,s.sign,s.sign2);
+  if(s.kite){
+    var kx=s.x+s.w-60,ky=s.y+30;
+    [[-120,0,'#d92a73'],[-80,22,'#f6b700'],[-160,18,'#3a9d5d']].forEach(function(k){
+      ctx.save();ctx.translate(kx+k[0],ky+k[1]);ctx.rotate(.4);ctx.fillStyle=k[2];ctx.fillRect(-12,-12,24,24);ctx.restore();
+    });
+  }
+}
+function plaque(x,y,g,e){
+  ctx.font='800 24px '+FONT;
+  var w=Math.max(ctx.measureText(g).width,e?ctx.measureText(e).width*0.62:0)+36;
+  frr(x-w/2,y-24,w,e?56:40,10,C.ink);
+  ctx.textAlign='center';ctx.textBaseline='alphabetic';
+  ctx.fillStyle=C.haldi;ctx.fillText(g,x,y+4);
+  if(e){ctx.font='600 14px '+FONT;ctx.fillStyle='#fff';ctx.fillText(e,x,y+24)}
+}
+function drawPerson(x,y,s,t){
+  ell(x+2,y+6,15,8,'rgba(27,24,64,.3)');
+  ell(x,y,14,11,s.shirt);
+  disc(x,y-2,9,'#c98b5b');
+  if(s.bun){disc(x,y-5,9,s.hat);disc(x,y-14,5,s.hat);disc(x,y+1,2,C.rani)}
+  else{ell(x,y-5,10,7,s.hat);ctx.strokeStyle='rgba(27,24,64,.3)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y-5,8,0,Math.PI);ctx.stroke()}
+}
+function drawCow(c){
+  var a=Math.atan2((c.by-c.ay)*c.dir,(c.bx-c.ax)*c.dir);
+  ctx.save();ctx.translate(c.x,c.y);ctx.rotate(a);
+  ell(3,6,24,12,'rgba(27,24,64,.25)');
+  ell(0,0,22,12,'#f4f1ea');ell(-6,-3,8,5,'#8a5a3a',.3);ell(7,4,6,4,'#8a5a3a');
+  ell(24,0,8,7,'#f4f1ea');ell(30,0,3,3,'#e9a4a4');
+  ctx.strokeStyle='#d9c9a8';ctx.lineWidth=3;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(22,-6);ctx.lineTo(26,-12);ctx.moveTo(22,6);ctx.lineTo(26,12);ctx.stroke();
+  ctx.strokeStyle='#f4f1ea';ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(-30,3);ctx.stroke();ctx.lineCap='butt';
+  ctx.restore();
+}
+function drawRickshaw(r){
+  var a=Math.atan2((r.by-r.ay)*r.dir,(r.bx-r.ax)*r.dir);
+  ctx.save();ctx.translate(r.x,r.y);ctx.rotate(a);
+  ell(2,6,24,12,'rgba(27,24,64,.28)');
+  frr(-20,-12,40,24,7,r.col);frr(-17,-10,28,20,5,'#1b1840');frr(-18,-10,26,20,6,'#2e8b57');
+  ctx.fillStyle='#9ad0ec';ctx.fillRect(12,-8,5,16);
+  ctx.restore();
+}
+function drawPlayer(){
+  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.ang);
+  if(boost>0){ctx.strokeStyle='rgba(255,246,224,.8)';ctx.lineWidth=3;for(var i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(-26,i*8);ctx.lineTo(-46-Math.random()*10,i*8);ctx.stroke()}}
+  ell(3,5,24,12,'rgba(27,24,64,.28)');
+  frr(-20,-8,40,16,7,'#f6b700');
+  frr(14,-11,5,22,2,C.ink);frr(-25,-7,6,14,3,C.ink);
+  ell(-3,0,7,10,C.rani);
+  frr(-16,-9,9,18,3,C.kesar);
+  disc(2,0,6.5,C.ink);disc(5,0,2.6,'#9ad0ec');
+  ctx.restore();
+}
+function drawJalebi(q,t){
+  if(!q.on)return;
+  var b=Math.sin(t*4+q.x)*2;
+  ell(q.x+2,q.y+8,12,5,'rgba(27,24,64,.25)');
+  disc(q.x,q.y+b,12,C.kesar);
+  ctx.strokeStyle='#ffd75e';ctx.lineWidth=3;ctx.beginPath();
+  for(var a=0;a<12;a+=.4){var r=1+a*.8;ctx.lineTo(q.x+Math.cos(a)*r,q.y+b+Math.sin(a)*r)}
+  ctx.stroke();
+}
+function drawKite(k,t){
+  ctx.save();ctx.translate(k.x,k.y);ctx.rotate(Math.sin(t*.8+k.ph)*.4);
+  ctx.strokeStyle='rgba(27,24,64,.55)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,k.s);ctx.quadraticCurveTo(-10,k.s+40,6,k.s+80);ctx.stroke();
+  ctx.fillStyle=k.col;ctx.beginPath();ctx.moveTo(0,-k.s);ctx.lineTo(k.s*.7,0);ctx.lineTo(0,k.s);ctx.lineTo(-k.s*.7,0);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-k.s);ctx.lineTo(0,k.s);ctx.moveTo(-k.s*.7,0);ctx.lineTo(k.s*.7,0);ctx.stroke();
+  ctx.restore();
+}
+function render(t){
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=C.ink;ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.setTransform(DPR*zoom,0,0,DPR*zoom,DPR*(VW/2-cam.x*zoom),DPR*(VH/2-cam.y*zoom));
+  drawGround();
+  var i;
+  for(i=0;i<pickups.length;i++)drawJalebi(pickups[i],t);
+  /* garba dancers */
+  var cols=[C.rani,C.haldi,C.neel,C.mehndi,C.kesar];
+  for(i=0;i<14;i++){var a=t*.9+i/14*TAU;disc(plaza.cx+Math.cos(a)*96,plaza.cy+Math.sin(a)*96,9,cols[i%5]);disc(plaza.cx+Math.cos(a)*96,plaza.cy+Math.sin(a)*96-2,5,'#c98b5b')}
+  for(i=0;i<STOPS.length-1;i++)drawPerson(STOPS[i].x,STOPS[i].y,STOPS[i],t);
+  for(i=0;i<solids.length;i++)drawBuilding(solids[i]);
+  /* target beacon */
+  if(state==='play'||state==='dialog'){
+    var tg=STOPS[state==='dialog'?dlgIdx:cur];
+    var pr=44+Math.sin(t*4)*5;
+    ctx.beginPath();ctx.arc(tg.x,tg.y,pr,0,TAU);ctx.strokeStyle=C.haldi;ctx.lineWidth=5;ctx.stroke();
+    ctx.beginPath();ctx.arc(tg.x,tg.y,pr+14,0,TAU);ctx.strokeStyle='rgba(246,183,0,.35)';ctx.lineWidth=4;ctx.stroke();
+    var bob=Math.sin(t*5)*5;
+    ctx.fillStyle=C.haldi;ctx.strokeStyle=C.ink;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(tg.x,tg.y-58+bob);ctx.lineTo(tg.x-13,tg.y-82+bob);ctx.lineTo(tg.x+13,tg.y-82+bob);ctx.closePath();ctx.fill();ctx.stroke();
+  }
+  for(i=0;i<cows.length;i++)drawCow(cows[i]);
+  for(i=0;i<rickshaws.length;i++)drawRickshaw(rickshaws[i]);
+  if(bellFx>0){ctx.beginPath();ctx.arc(p.x,p.y,170*(1-bellFx/.6),0,TAU);ctx.strokeStyle='rgba(255,255,255,'+(bellFx/.6)+')';ctx.lineWidth=4;ctx.stroke()}
+  drawPlayer();
+  for(i=0;i<kites.length;i++)drawKite(kites[i],t);
+  /* screen-space overlay */
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(state==='play'){
+    var tt=STOPS[cur],sx=(tt.x-cam.x)*zoom+VW/2,sy=(tt.y-cam.y)*zoom+VH/2;
+    if(sx<50||sx>VW-50||sy<150||sy>VH-60){
+      var dx=sx-VW/2,dy=sy-VH/2,k=Math.min((VW/2-46)/Math.max(1,Math.abs(dx)),(VH/2-110)/Math.max(1,Math.abs(dy)));
+      var ax=VW/2+dx*k,ay=VH/2+dy*k+20,ang=Math.atan2(dy,dx);
+      ctx.save();ctx.translate(ax,ay);ctx.rotate(ang);
+      ctx.fillStyle=C.haldi;ctx.strokeStyle=C.ink;ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(16,0);ctx.lineTo(-10,-14);ctx.lineTo(-4,0);ctx.lineTo(-10,14);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.restore();
+    }
+  }
+  drawMini();
+}
+function drawMini(){
+  var s=mm.width/WW;
+  mctx.setTransform(1,0,0,1,0,0);
+  mctx.fillStyle=C.sand;mctx.fillRect(0,0,mm.width,mm.height);
+  mctx.fillStyle=C.grass;mctx.fillRect(0,1500*s,mm.width,300*s);
+  mctx.fillStyle=C.road;
+  [300,1000,1700].forEach(function(x){mctx.fillRect((x-70)*s,0,140*s,1340*s)});
+  [260,760,1160].forEach(function(y){mctx.fillRect(0,(y-70)*s,mm.width,140*s)});
+  mctx.fillRect(0,1620*s,mm.width,140*s);mctx.fillRect(930*s,1500*s,140*s,300*s);
+  mctx.fillStyle=C.water;mctx.fillRect(0,1340*s,mm.width,160*s);
+  mctx.fillStyle=C.road;mctx.fillRect(930*s,1340*s,140*s,160*s);
+  for(var i=0;i<solids.length;i++){var o=solids[i];if(o.kind==='water')continue;mctx.fillStyle=o.c;mctx.fillRect(o.x*s,o.y*s,o.w*s,o.h*s)}
+  mctx.fillStyle=C.haldi;mctx.fillRect(plaza.x*s,plaza.y*s,plaza.w*s,plaza.h*s);
+  if(state==='play'||state==='dialog'){
+    var t=STOPS[cur];
+    mctx.beginPath();mctx.arc(t.x*s,t.y*s,9,0,TAU);mctx.fillStyle=C.rani;mctx.fill();
+    mctx.lineWidth=3;mctx.strokeStyle='#fff';mctx.stroke();
+  }
+  mctx.beginPath();mctx.arc(p.x*s,p.y*s,6,0,TAU);mctx.fillStyle=C.ink;mctx.fill();mctx.lineWidth=2.5;mctx.strokeStyle='#fff';mctx.stroke();
+}
+
+/* ---------- HUD ---------- */
+var hc={};
+function setText(id,v){if(hc[id]!==v){hc[id]=v;$(id).textContent=v}}
+function hud(){
+  var t=STOPS[cur]||STOPS[LAST];
+  setText('stopno','સ્ટોપ '+Math.min(cur,6)+'/6');
+  setText('rs','₹'+score);
+  setText('tm',Math.max(0,Math.ceil(leg))+'s');
+  setText('objGu',t.gn+' · '+t.pl);
+  var d=Math.round(Math.hypot(t.x-p.x,t.y-p.y)/10);
+  setText('objEn',t.en+' · '+t.ple+' · '+d+' m');
+  setText('carry',cur>0?'તમારી પાસે: '+STOPS[cur-1].carry:'');
+}
+
+/* ---------- loop ---------- */
+var last=performance.now();
+function frame(now){
+  var dt=Math.min(.05,(now-last)/1000);last=now;
+  tclock+=dt;
+  if(bellFx>0)bellFx-=dt;
+  if(state==='play')update(dt);
+  if(state!=='dialog')updateThings(dt);
+  cam.x+=(p.x-cam.x)*Math.min(1,dt*6);cam.y+=(p.y-cam.y)*Math.min(1,dt*6);
+  render(tclock);
+  if(state==='play'||state==='dialog')hud();
+  requestAnimationFrame(frame);
+}
+reset();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</html>
